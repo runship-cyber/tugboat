@@ -1,0 +1,180 @@
+name: Tugboat
+
+# Automatically create a pull request for collaboratively editing a Markdown
+# file that relates to a specific issue on GitHub.
+#
+# Authored by @mattpollard.
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  create-pull-request:
+    runs-on: ubuntu-latest
+    env:
+
+      # ✍️ Edit the environment variables below to control how Tugboat behaves.
+
+
+      # When you apply this label to an issue, Tugboat starts working.
+      #
+      # Type: string
+      # Default: tugboat
+
+      LABEL: tugboat
+
+
+      # The repository where Tugboat will create the Markdown file and pull
+      # request. By default, Tugboat creates the Markdown file and pull request
+      # in the repository where you install this action. If you want to specify
+      # a different repository, you'll need to read the notes and modify the
+      # value for ACCESS_TOKEN below.
+      #
+      # Type: string
+      # Default: ${{ github.repository }}
+
+      MARKDOWN_REPOSITORY: ${{ github.repository }}
+
+
+      # The token that Tugboat uses to make GitHub API requests. By default,
+      # this is GITHUB_TOKEN (📚 https://git.io/Jfhdd), which means that Tugboat
+      # will only be able to access API endpoints for the repository where you
+      # configure this action. If you'd like Tugboat to create the Markdown file
+      # and pull request in another repository, you'll need to create a personal
+      # access token with repo scope and store it as an encrypted secret for the
+      # repository where you configure this action. Consider using a personal
+      # access token for a machine user account on GitHub.
+      # (📚 https://git.io/JfAi9, https://git.io/JfAiH)
+      #
+      # Type: string
+      # Default: ${{ secrets.GITHUB_TOKEN }}
+
+      ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+      # The path to the Markdown file that Tugboat will copy into place for the
+      # pull request. The path is in the repository where you install this
+      # action.
+      #
+      # Type: string
+      # Default: .github/workflows/tugboat/tugboat.md
+
+      MARKDOWN_TEMPLATE_FILE_PATH: .github/workflows/tugboat/tugboat.md
+
+
+      # The path where Tugboat will create the Markdown file for the pull
+      # request. By default, it's in a directory named "tugboat", within
+      # subdirectories named after the repository owner and repository name.
+      #
+      # Type: string
+      # Default: tugboat/${{ github.repository }}
+
+      MARKDOWN_PATH: tugboat/${{ github.repository }}
+
+
+      # Determines whether the pull request that Tugboat creates is a draft.
+      # (📚 https://git.io/JfhNU) Note that draft pull requests aren't available
+      # for all GitHub products. If the repository doesn't support draft pull
+      # requests, the workflow run will fail.
+      #
+      # Type: boolean
+      # Default: false
+
+      PULL_IS_DRAFT: false
+
+
+      # Determines whether the pull request that Tugboat creates should close
+      # the issue where you applied Tugboat's label when you merge the pull
+      # request. (📚 https://git.io/JfhNq)
+      #
+      # Type: boolean
+      # Default: false
+
+      PULL_CLOSES_ISSUE: false
+
+
+      # The leading text for the title of the pull request that Tugboat creates.
+      # By default, the full title will include this text, a space, and then the
+      # title of the issue where you applied Tugboat's label.
+      #
+      # Type: string
+      # Default: 🚢 Tugboat for
+
+      PULL_TITLE_PREFIX: 🚢 Tugboat for
+
+
+      # The path to the Markdown file that Tugboat will inject into the body of the
+      # initial comment in the pull request.
+      #
+      # Type: string
+      # Default: .github/workflows/tugboat/pull_body.md
+
+      PULL_BODY_TEMPLATE_FILE_PATH: .github/workflows/tugboat/pull_body.md
+
+
+      # The text that Tugboat injects at the beginning of the body of the
+      # initial comment in the pull request. By default, it includes a link back
+      # to the issue where you applied Tugboat's label.
+      #
+      # Type: string
+      # Default: Tugboat created this pull request so you and your team can
+      #          collaborate on a Markdown file that relates to
+      #          ${{ github.event.issue.html_url }} 🚢
+
+      PULL_BODY_INTRODUCTION: Tugboat created this pull request so you and your
+                              team can collaborate on a Markdown file that
+                              relates to ${{ github.event.issue.html_url }} 🚢
+
+
+      # Determines whether Tugboat should comment on the issue where you applied
+      # the Tugboat label once Tugboat finishes working. Tugboat comments after
+      # creating the pull request, or if there was a problem creating the pull
+      # request.
+      #
+      # Type: boolean
+      # Default: true
+
+      COMMENT_ON_ISSUE: true
+
+    steps:
+
+    - name: Begin workflow run for '${{ github.event.label.name }}' label
+      run: echo ${{ github.actor }} added \'${{ github.event.label.name }}\'
+           label to ${{ github.event.issue.html_url }}. Checking conditions...
+
+    - name: Check out repository with workflow
+      if: github.event.label.name == env.LABEL
+      uses: actions/checkout@v2
+      with:
+        repository: ${{ github.repository }}
+        path: workflow
+
+    - name: Check out separate repository with Markdown files
+      if: ( github.event.label.name == env.LABEL &&
+            github.repository != env.MARKDOWN_REPOSITORY )
+      uses: actions/checkout@v2
+      with:
+        repository: ${{ env.MARKDOWN_REPOSITORY }}
+        token: ${{ env.ACCESS_TOKEN }}
+        path: markdown
+
+    - name: Run script to create pull request
+      if: github.event.label.name == env.LABEL
+      env:
+
+        # ⚠️ In normal use, there's no need to edit the following environment
+        #    variables. Tugboat's script relies on these variables, so edit with
+        #    caution.
+        
+        ACTOR: ${{ github.actor }}
+        ISSUE_URL: ${{ github.event.issue.html_url }}
+        ISSUE_COMMENTS_API_URL: ${{ github.event.issue.comments_url }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+        ISSUE_TITLE: ${{ github.event.issue.title }}
+        GIT_USER_EMAIL: actions@github.com
+        GIT_USER_NAME: GitHub Actions
+
+      run: |
+        [[ -d markdown ]] && cd markdown || cd workflow
+        $GITHUB_WORKSPACE/workflow/.github/workflows/tugboat/tugboat.sh
